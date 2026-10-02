@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — CareerTrack AI{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}Overview of your job application pipeline, interview metrics, and AI resume matching.{% endblock %}
+
+{% block content %}
+<div class="dashboard-page">
+    
+    <!-- Top Stats Grid -->
+    <div class="stats-grid">
+        <!-- Stat 1: Total Applications -->
+        <div class="stat-card stat-total">
+            <div class="stat-card-top">
+                <span class="stat-label">Total Applications</span>
+                <div class="stat-icon-wrapper">
+                    <i data-lucide="layers"></i>
+                </div>
+            </div>
+            <div class="stat-value" id="stat-total-val">0</div>
+            <div class="stat-card-bottom">
+                <span class="stat-trend-chip positive">
+                    <i data-lucide="trending-up"></i> Active
+                </span>
+                <span class="stat-desc-text">In your tracking pipeline</span>
+            </div>
+        </div>
+
+        <!-- Stat 2: Interviews -->
+        <div class="stat-card stat-interview">
+            <div class="stat-card-top">
+                <span class="stat-label">Interviews</span>
+                <div class="stat-icon-wrapper">
+                    <i data-lucide="target"></i>
+                </div>
+            </div>
+            <div class="stat-value" id="stat-interview-val">0</div>
+            <div class="stat-card-bottom">
+                <span class="stat-trend-chip positive" id="stat-interview-rate-chip">0% rate</span>
+                <span class="stat-desc-text">Screening & rounds</span>
+            </div>
+        </div>
+
+        <!-- Stat 3: Offers -->
+        <div class="stat-card stat-offer">
+            <div class="stat-card-top">
+                <span class="stat-label">Offers Received</span>
+                <div class="stat-icon-wrapper">
+                    <i data-lucide="award"></i>
+                </div>
+            </div>
+            <div class="stat-value" id="stat-offer-val">0</div>
+            <div class="stat-card-bottom">
+                <span class="stat-trend-chip positive" id="stat-offer-rate-chip">0% rate</span>
+                <span class="stat-desc-text">Final offer stage</span>
+            </div>
+        </div>
+
+        <!-- Stat 4: Rejected -->
+        <div class="stat-card stat-rejected">
+            <div class="stat-card-top">
+                <span class="stat-label">Rejected / Archived</span>
+                <div class="stat-icon-wrapper">
+                    <i data-lucide="archive"></i>
+                </div>
+            </div>
+            <div class="stat-value" id="stat-rejected-val">0</div>
+            <div class="stat-card-bottom">
+                <span class="stat-trend-chip neutral">Archived</span>
+                <span class="stat-desc-text">Closed opportunities</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics Section (Chart.js) -->
+    <section class="analytics-section" id="analytics-section">
+        <div class="analytics-grid">
+            <!-- Chart 1: Applications by Status -->
+            <div class="chart-card">
+                <div class="chart-card-header">
+                    <div class="chart-title-wrap">
+                        <h3>Applications by Status</h3>
+                        <p class="chart-subtitle">Distribution across your pipeline stages</p>
+                    </div>
+                    <span class="chart-tag">Status Mix</span>
+                </div>
+                <div class="chart-canvas-wrap">
+                    <canvas id="statusChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 2: Application Pipeline Activity -->
+            <div class="chart-card">
+                <div class="chart-card-header">
+                    <div class="chart-title-wrap">
+                        <h3>Application Activity</h3>
+                        <p class="chart-subtitle">Applications logged across stages</p>
+                    </div>
+                    <span class="chart-tag">Activity</span>
+                </div>
+                <div class="chart-canvas-wrap">
+                    <canvas id="trendsChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- AI Job Analysis Showcase Section (Visual Highlight) -->
+    <section class="ai-showcase-section" id="ai-analysis-section">
+        <div class="ai-showcase-card">
+            <div class="ai-showcase-header">
+                <div>
+                    <div class="ai-badge-row">
+                        <span class="ai-glow-tag">
+                            <i data-lucide="sparkles"></i>
+                            AI NLP ENGINE
+                        </span>
+                    </div>
+                    <h2>AI Resume & Job Fit Analysis</h2>
+                    <p class="ai-showcase-subtitle">Extract technical requirements with scikit-learn TF-IDF and identify skill matches & gaps.</p>
+                </div>
+
+                <div>
+                    {% if resume and resume.filename %}
+                        <a href="{{ url_for('resume_page') }}" class="ai-resume-status-chip loaded" title="Active resume loaded">
+                            <span class="dot"></span>
+                            <span>Active Resume: <strong>{{ resume.filename }}</strong></span>
+                        </a>
+                    {% else %}
+                        <a href="{{ url_for('resume_page') }}" class="ai-resume-status-chip empty" title="Click to upload resume">
+                            <span class="dot"></span>
+                            <span>No Resume Uploaded (Click to add PDF)</span>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Selector Toolbar -->
+            <div class="ai-selector-toolbar">
+                <div class="selector-flex">
+                    <div class="selector-group">
+                        <label for="dashboard-job-select">Select Application to Evaluate</label>
+                        <select id="dashboard-job-select" onchange="handleJobSelectChange(this.value)">
+                            <option value="">-- Select an application from your tracker --</option>
+                            {% if applications %}
+                                {% for app in applications %}
+                                    <option value="{{ app.id }}" 
+                                            data-company="{{ app.company }}" 
+                                            data-role="{{ app.job_role }}"
+                                            data-description="{{ app.job_description or '' }}">
+                                        {{ app.company }} — {{ app.job_role }} ({{ app.status }})
+                                    </option>
+                                {% endfor %}
+                            {% endif %}
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-ai-run" id="dashboard-analyze-btn" onclick="triggerDashboardAnalysis()">
+                        <i data-lucide="sparkles"></i>
+                        <span>Run AI Evaluation</span>
+                    </button>
+                </div>
+
+                <details class="custom-desc-toggle-details">
+                    <summary>Or paste / edit job description text manually</summary>
+                    <textarea id="dashboard-custom-desc" rows="3" placeholder="Paste target requirements, responsibilities, and required stack here..."></textarea>
+                </details>
+            </div>
+
+            <!-- Initial Empty Prompt (Before Analysis is triggered) -->
+            <div class="ai-empty-prompt" id="ai-empty-placeholder">
+                <div class="ai-empty-icon-circle">
+                    <i data-lucide="cpu"></i>
+                </div>
+                <h4>Ready for AI Evaluation</h4>
+                <p>Select any application above or click <strong>⚡ Analyze</strong> in the table below to generate match scores, detected skills, and gap recommendations.</p>
+            </div>
+
+            <!-- AI Results Showcase Container (Visible after evaluation) -->
+            <div class="ai-results-showcase-grid" id="ai-results-grid" style="display: none;">
+                
+                <!-- Left: Circular Gauge Match Score Card -->
+                <div class="ai-score-gauge-card">
+                    <div class="gauge-header">
+                        <h4>Resume Match Score</h4>
+                        <span class="strength-badge" id="dash-strength-badge">Moderate Match</span>
+                    </div>
+
+                    <!-- SVG Circular Progress Gauge -->
+                    <div class="svg-circular-gauge">
+                        <svg viewBox="0 0 160 160">
+                            <circle class="gauge-bg-circle" cx="80" cy="80" r="70"></circle>
+                            <circle class="gauge-progress-circle" id="dash-circular-progress" cx="80" cy="80" r="70"></circle>
+                        </svg>
+                        <div class="gauge-center-text">
+                            <span class="gauge-pct-number" id="dash-match-pct">0%</span>
+                            <span class="gauge-caption">Fit Score</span>
+                        </div>
+                    </div>
+
+                    <div class="gauge-metrics-row">
+                        <div class="gauge-metric-box">
+                            <span class="gauge-metric-label">Cosine Similarity</span>
+                            <span class="gauge-metric-val" id="dash-similarity-score">0.0000</span>
+                        </div>
+                        <div class="gauge-metric-box">
+                            <span class="gauge-metric-label">Skill Coverage</span>
+                            <span class="gauge-metric-val" id="dash-skill-coverage">0 / 0</span>
+                        </div>
+                    </div>
+
+                    <!-- Weighted Match Score Breakdown -->
+                    <div class="weighted-breakdown-card" id="dash-weighted-breakdown">
+                        <div class="weighted-breakdown-header">
+                            <span class="weighted-title">Score Breakdown</span>
+                            <span class="weighted-weights-badge">60% Skills · 40% Text</span>
+                        </div>
+
+                        <div class="weighted-item">
+                            <div class="weighted-item-top">
+                                <span class="weighted-item-lbl">
+                                    <i data-lucide="check-circle-2" style="color: var(--success); width: 13px; height: 13px;"></i>
+                                    Skill Match
+                                </span>
+                                <span class="weighted-item-val" id="dash-skill-score-val">0%</span>
+                            </div>
+                            <div class="weighted-bar-track">
+                                <div class="weighted-bar-fill fill-skills" id="dash-skill-progress-bar" style="width: 0%;"></div>
+                            </div>
+                        </div>
+
+                        <div class="weighted-item">
+                            <div class="weighted-item-top">
+                                <span class="weighted-item-lbl">
+                                    <i data-lucide="file-text" style="color: var(--info); width: 13px; height: 13px;"></i>
+                                    Text Similarity
+                                </span>
+                                <span class="weighted-item-val" id="dash-tfidf-score-val">0%</span>
+                            </div>
+                            <div class="weighted-bar-track">
+                                <div class="weighted-bar-fill fill-tfidf" id="dash-tfidf-progress-bar" style="width: 0%;"></div>
+                            </div>
+                        </div>
+
+                        <div class="weighted-formula-pill" id="dash-weighted-formula">
+                            (0% × 0.60) + (0% × 0.40) = <strong>0% Final Score</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Skill Gap Analysis, Rule-Based Recommendations, & Details -->
+                <div class="ai-insights-column">
+                    
+                    <!-- NEW: Skill Gap Analysis Section -->
+                    <div class="skill-gap-analysis-card">
+                        <div class="skill-gap-card-header">
+                            <div class="skill-gap-title-group">
+                                <h4>
+                                    <i data-lucide="git-pull-request" style="color: var(--primary); width: 17px; height: 17px;"></i>
+                                    Skill Gap Analysis
+                                </h4>
+                                <p>Requirement breakdown and technical skill alignment.</p>
+                            </div>
+                            <span class="skill-coverage-badge">
+                                <i data-lucide="target" style="width: 13px; height: 13px;"></i>
+                                Skill Coverage: <span id="dash-skill-coverage-pct">0%</span>
+                            </span>
+                        </div>
+
+                        <!-- 3-Column Visual Breakdown: Required vs Your Skills vs Missing -->
+                        <div class="skill-gap-3col-grid">
+                            <!-- Col 1: Required Skills -->
+                            <div class="skill-gap-col-card">
+                                <div class="skill-gap-col-header">
+                                    <h6>
+                                        <i data-lucide="layers" style="color: #A5B4FC; width: 13px; height: 13px;"></i>
+                                        Required Skills
+                                    </h6>
+                                    <span class="skill-count-chip" id="dash-req-count">0</span>
+                                </div>
+                                <div class="skills-badge-list" id="dash-required-skills">
+                                    <span class="no-skills-note">No technical skills detected in job.</span>
+                                </div>
+                            </div>
+
+                            <!-- Col 2: Skills Found in Resume (Your Skills) -->
+                            <div class="skill-gap-col-card">
+                                <div class="skill-gap-col-header">
+                                    <h6>
+                                        <i data-lucide="check-circle-2" style="color: var(--success); width: 13px; height: 13px;"></i>
+                                        Your Skills
+                                    </h6>
+                                    <span class="skill-count-chip" id="dash-your-count">0</span>
+                                </div>
+                                <div class="skills-badge-list" id="dash-your-skills">
+                                    <span class="no-skills-note">No matching skills detected.</span>
+                                </div>
+                            </div>
+
+                            <!-- Col 3: Missing Skills -->
+                            <div class="skill-gap-col-card">
+                                <div class="skill-gap-col-header">
+                                    <h6>
+                                        <i data-lucide="alert-triangle" style="color: var(--danger); width: 13px; height: 13px;"></i>
+                                        Missing Skills
+                                    </h6>
+                                    <span class="skill-count-chip" id="dash-miss-count">0</span>
+                                </div>
+                                <div class="skills-badge-list" id="dash-missing-skills">
+                                    <span class="no-skills-note" style="color: var(--success);">✓ None — All skills matched!</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- NEW: Rule-Based Skill Recommendations System -->
+                    <div class="rule-recommendations-card">
+                        <div class="rule-rec-header">
+                            <h5>
+                                <i data-lucide="book-open" style="color: #FBBF24; width: 16px; height: 16px;"></i>
+                                Skill Gap Recommendations (Rule-Based)
+                            </h5>
+                            <span class="rule-badge-tag">Curated Advice</span>
+                        </div>
+                        <div id="dash-rule-recs-container">
+                            <div class="rule-rec-empty-success">
+                                <i data-lucide="check-circle-2" style="width: 18px; height: 18px; flex-shrink: 0;"></i>
+                                <span>Select an application above or run analysis to view targeted skill learning guidelines.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Strategic Advice Box -->
+                    <div class="ai-recommendations-box">
+                        <h6>
+                            <i data-lucide="lightbulb" style="width: 14px; height: 14px;"></i>
+                            Strategic Positioning Tips
+                        </h6>
+                        <ul class="ai-rec-list" id="dash-recommendations-list">
+                            <li>Focus on highlighting relevant keywords in your experience summary.</li>
+                            <li>Include demonstrable project artifacts matching the job stack.</li>
+                        </ul>
+                    </div>
+
+                    <!-- Job Description Preview -->
+                    <div class="job-desc-preview-card">
+                        <div class="ai-subcard-header">
+                            <h5>
+                                <i data-lucide="file-text" style="width: 16px; height: 16px;"></i>
+                                Job Description: <span id="dash-job-target-info" style="color: var(--text-primary); font-weight: 700; margin-left: 4px;">Role Details</span>
+                            </h5>
+                        </div>
+                        <div class="job-desc-prose" id="dash-job-desc-content">
+                            No description recorded for this role.
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Applications Data Table Section -->
+    <section class="table-card" id="applications-table-section">
+        <div class="table-toolbar">
+            <div class="table-title-group">
+                <h3>Tracked Applications</h3>
+                <p>Manage application statuses and evaluate resume fit.</p>
+            </div>
+
+            <!-- Status Filter Tabs -->
+            <div class="status-filter-pills">
+                <button type="button" class="filter-pill-btn active" onclick="filterTableByStatus('all', this)">All</button>
+                <button type="button" class="filter-pill-btn" onclick="filterTableByStatus('Applied', this)">Applied</button>
+                <button type="button" class="filter-pill-btn" onclick="filterTableByStatus('Interview', this)">Interview</button>
+                <button type="button" class="filter-pill-btn" onclick="filterTableByStatus('Offer', this)">Offer</button>
+                <button type="button" class="filter-pill-btn" onclick="filterTableByStatus('Pending', this)">Pending</button>
+                <button type="button" class="filter-pill-btn" onclick="filterTableByStatus('Rejected', this)">Rejected</button>
+            </div>
+        </div>
+
+        <div class="table-responsive-container">
+            <table class="applications-table">
+                <thead>
+                    <tr>
+                        <th>Company</th>
+                        <th>Role / Position</th>
+                        <th>Status</th>
+                        <th>Date Applied</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 35px; color: var(--text-muted);">
+                            Loading applications pipeline...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+</div>
+{% endblock %}

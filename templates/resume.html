@@ -1,0 +1,592 @@
+{% extends "base.html" %}
+
+{% block title %}Resume & AI Matcher — CareerTrack AI{% endblock %}
+{% block page_title %}Resume & AI Matcher{% endblock %}
+{% block page_subtitle %}Upload a PDF resume to extract text using PyPDF2 and evaluate technical skill compatibility.{% endblock %}
+
+{% block content %}
+<div class="resume-page">
+    
+    <!-- Top Row: Upload Card & Status Card -->
+    <div class="resume-layout-grid">
+        <!-- Card 1: Upload Card -->
+        <div class="saas-card">
+            <div class="saas-card-header">
+                <h3>Upload PDF Resume</h3>
+                <span class="chart-tag">PyPDF2 Parser</span>
+            </div>
+
+            <form action="{{ url_for('resume_page') }}" method="POST" enctype="multipart/form-data" id="resume-upload-form">
+                <div class="saas-dropzone" id="saas-dropzone">
+                    <div class="dropzone-icon-wrap">
+                        <i data-lucide="upload-cloud"></i>
+                    </div>
+                    <div class="dropzone-title"><strong>Click to browse</strong> or drag & drop PDF here</div>
+                    <div class="dropzone-subtitle">Supported format: Adobe PDF (.pdf)</div>
+                    <input type="file" id="resume-file-input" name="resume" accept=".pdf,application/pdf" required class="file-input-hidden">
+                    
+                    <div class="selected-file-pill" id="selected-file-pill" style="display: none;">
+                        <i data-lucide="file-check" style="width: 16px; height: 16px; color: var(--success);"></i>
+                        <span id="selected-file-name-text">filename.pdf</span>
+                    </div>
+                </div>
+
+                <div style="margin-top: 18px;">
+                    <button type="submit" class="btn btn-primary btn-block" id="resume-submit-btn">
+                        <i data-lucide="file-text"></i>
+                        <span>Upload & Extract Text</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Card 2: Current In-Memory Resume Status -->
+        <div class="saas-card">
+            <div class="saas-card-header">
+                <h3>In-Memory Resume Status</h3>
+                {% if resume and resume.filename %}
+                <form action="{{ url_for('clear_resume') }}" method="POST" onsubmit="return confirm('Clear stored resume text from memory?')">
+                    <button type="submit" class="btn btn-secondary btn-sm" style="color: #F87171;">
+                        <i data-lucide="trash-2"></i>
+                        <span>Clear</span>
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+
+            {% if resume and resume.filename %}
+                <div class="ai-resume-status-chip loaded" style="width: 100%; justify-content: flex-start; margin-bottom: 16px; padding: 10px 14px;">
+                    <span class="dot"></span>
+                    <span>Active in Memory: <strong>{{ resume.filename }}</strong></span>
+                </div>
+
+                <div class="resume-stats-grid">
+                    <div class="resume-stat-box">
+                        <span class="resume-stat-lbl">Uploaded At</span>
+                        <span class="resume-stat-num" style="font-size: 12px;">{{ resume.uploaded_at }}</span>
+                    </div>
+                    <div class="resume-stat-box">
+                        <span class="resume-stat-lbl">Total Pages</span>
+                        <span class="resume-stat-num">{{ resume.page_count }}</span>
+                    </div>
+                    <div class="resume-stat-box">
+                        <span class="resume-stat-lbl">Word Count</span>
+                        <span class="resume-stat-num">{{ resume.word_count }}</span>
+                    </div>
+                </div>
+
+                <div style="margin-top: 16px;">
+                    <a href="#matcher-tool-card" class="btn btn-secondary btn-block btn-sm" style="justify-content: center;">
+                        <i data-lucide="sparkles"></i>
+                        <span>Match Against Job Below</span>
+                    </a>
+                </div>
+            {% else %}
+                <div class="ai-empty-prompt" style="padding: 30px 16px;">
+                    <div class="ai-empty-icon-circle" style="width: 44px; height: 44px; margin-bottom: 10px;">
+                        <i data-lucide="file-warning" style="width: 20px; height: 20px;"></i>
+                    </div>
+                    <h4>No Resume in Memory</h4>
+                    <p style="font-size: 12px;">Upload a PDF to enable automatic AI matching, skill extraction, and gap analysis across all jobs.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- AI Matcher Tool Card -->
+    <div class="saas-card" id="matcher-tool-card" style="margin-bottom: 28px;">
+        <div class="saas-card-header">
+            <div>
+                <h3>NLP Job Matcher & Skill Gap Analyzer</h3>
+                <p class="chart-subtitle">Compare resume text against any job description using TF-IDF & Skill Coverage.</p>
+            </div>
+            <span class="chart-tag">POST /analyze-job</span>
+        </div>
+
+        <form id="standalone-matcher-form" onsubmit="handleStandaloneJobMatch(event)">
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                {% if applications %}
+                <div class="form-group">
+                    <label for="standalone-job-select">Load from Saved Applications (Optional):</label>
+                    <select id="standalone-job-select" onchange="loadJobIntoTextarea(this.value)">
+                        <option value="">-- Choose a tracked application or paste below --</option>
+                        {% for app in applications %}
+                            <option value="{{ app.id }}" data-description="{{ app.job_description or '' }}">
+                                {{ app.company }} — {{ app.job_role }} ({{ app.status }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
+                <div class="form-group">
+                    <label for="standalone-job-desc">Job Description & Requirements *</label>
+                    <textarea id="standalone-job-desc" rows="5" placeholder="Paste job posting text, technical stack requirements, or key responsibilities..." required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="standalone-custom-resume">Resume Text:</label>
+                    <textarea id="standalone-custom-resume" rows="3" placeholder="{% if resume and resume.text %}Using active uploaded resume ({{ resume.filename }}) by default. Leave empty or paste custom text...{% else %}Paste resume text or upload PDF above...{% endif %}"></textarea>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end;">
+                    <button type="submit" class="btn btn-primary" id="standalone-match-btn">
+                        <i data-lucide="sparkles"></i>
+                        <span>Calculate Match & Gap Analysis</span>
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <!-- Match Result Container -->
+        <div id="standalone-result-container" style="display: none; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-subtle);">
+            <div class="ai-results-showcase-grid">
+                <!-- Score Card -->
+                <div class="ai-score-gauge-card">
+                    <div class="gauge-header">
+                        <h4>Fit Evaluation</h4>
+                        <span class="strength-badge" id="standalone-strength-badge">Moderate</span>
+                    </div>
+
+                    <div class="svg-circular-gauge">
+                        <svg viewBox="0 0 160 160">
+                            <circle class="gauge-bg-circle" cx="80" cy="80" r="70"></circle>
+                            <circle class="gauge-progress-circle" id="standalone-gauge-circle" cx="80" cy="80" r="70"></circle>
+                        </svg>
+                        <div class="gauge-center-text">
+                            <span class="gauge-pct-number" id="standalone-match-pct">0%</span>
+                            <span class="gauge-caption">Match Score</span>
+                        </div>
+                    </div>
+
+                    <div class="gauge-metrics-row">
+                        <div class="gauge-metric-box">
+                            <span class="gauge-metric-label">Cosine Score</span>
+                            <span class="gauge-metric-val" id="standalone-sim-score">0.0000</span>
+                        </div>
+                        <div class="gauge-metric-box">
+                            <span class="gauge-metric-label">Source</span>
+                            <span class="gauge-metric-val" id="standalone-source-val" style="font-size: 11px;">In-Memory</span>
+                        </div>
+                    </div>
+
+                    <!-- Weighted Match Score Breakdown -->
+                    <div class="weighted-breakdown-card" id="standalone-weighted-breakdown">
+                        <div class="weighted-breakdown-header">
+                            <span class="weighted-title">Score Breakdown</span>
+                            <span class="weighted-weights-badge">60% Skills · 40% Text</span>
+                        </div>
+
+                        <div class="weighted-item">
+                            <div class="weighted-item-top">
+                                <span class="weighted-item-lbl">
+                                    <i data-lucide="check-circle-2" style="color: var(--success); width: 13px; height: 13px;"></i>
+                                    Skill Match
+                                </span>
+                                <span class="weighted-item-val" id="standalone-skill-score-val">0%</span>
+                            </div>
+                            <div class="weighted-bar-track">
+                                <div class="weighted-bar-fill fill-skills" id="standalone-skill-progress-bar" style="width: 0%;"></div>
+                            </div>
+                        </div>
+
+                        <div class="weighted-item">
+                            <div class="weighted-item-top">
+                                <span class="weighted-item-lbl">
+                                    <i data-lucide="file-text" style="color: var(--info); width: 13px; height: 13px;"></i>
+                                    Text Similarity
+                                </span>
+                                <span class="weighted-item-val" id="standalone-tfidf-score-val">0%</span>
+                            </div>
+                            <div class="weighted-bar-track">
+                                <div class="weighted-bar-fill fill-tfidf" id="standalone-tfidf-progress-bar" style="width: 0%;"></div>
+                            </div>
+                        </div>
+
+                        <div class="weighted-formula-pill" id="standalone-weighted-formula">
+                            (0% × 0.60) + (0% × 0.40) = <strong>0% Final Match</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Skill Gap Analysis, Rule-Based Recommendations, & Keywords -->
+                <div class="ai-insights-column">
+                    
+                    <!-- NEW: Skill Gap Analysis Section -->
+                    <div class="skill-gap-analysis-card">
+                        <div class="skill-gap-card-header">
+                            <div class="skill-gap-title-group">
+                                <h4>
+                                    <i data-lucide="git-pull-request" style="color: var(--primary); width: 17px; height: 17px;"></i>
+                                    Skill Gap Analysis
+                                </h4>
+                                <p>Requirement breakdown and technical skill alignment.</p>
+                            </div>
+                            <span class="skill-coverage-badge">
+                                <i data-lucide="target" style="width: 13px; height: 13px;"></i>
+                                Skill Coverage: <span id="standalone-skill-coverage-pct">0%</span>
+                            </span>
+                        </div>
+
+                        <!-- 3-Column Visual Breakdown: Required vs Your Skills vs Missing -->
+                        <div class="skill-gap-3col-grid">
+                            <!-- Col 1: Required Skills -->
+                            <div class="skill-gap-col-card">
+                                <div class="skill-gap-col-header">
+                                    <h6>
+                                        <i data-lucide="layers" style="color: #A5B4FC; width: 13px; height: 13px;"></i>
+                                        Required Skills
+                                    </h6>
+                                    <span class="skill-count-chip" id="standalone-req-count">0</span>
+                                </div>
+                                <div class="skills-badge-list" id="standalone-required-skills">
+                                    <span class="no-skills-note">No skills detected.</span>
+                                </div>
+                            </div>
+
+                            <!-- Col 2: Skills Found in Resume (Your Skills) -->
+                            <div class="skill-gap-col-card">
+                                <div class="skill-gap-col-header">
+                                    <h6>
+                                        <i data-lucide="check-circle-2" style="color: var(--success); width: 13px; height: 13px;"></i>
+                                        Your Skills
+                                    </h6>
+                                    <span class="skill-count-chip" id="standalone-your-count">0</span>
+                                </div>
+                                <div class="skills-badge-list" id="standalone-your-skills">
+                                    <span class="no-skills-note">No skills detected.</span>
+                                </div>
+                            </div>
+
+                            <!-- Col 3: Missing Skills -->
+                            <div class="skill-gap-col-card">
+                                <div class="skill-gap-col-header">
+                                    <h6>
+                                        <i data-lucide="alert-triangle" style="color: var(--danger); width: 13px; height: 13px;"></i>
+                                        Missing Skills
+                                    </h6>
+                                    <span class="skill-count-chip" id="standalone-miss-count">0</span>
+                                </div>
+                                <div class="skills-badge-list" id="standalone-missing-skills">
+                                    <span class="no-skills-note" style="color: var(--success);">✓ None — All matched!</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- NEW: Rule-Based Skill Recommendations System -->
+                    <div class="rule-recommendations-card">
+                        <div class="rule-rec-header">
+                            <h5>
+                                <i data-lucide="book-open" style="color: #FBBF24; width: 16px; height: 16px;"></i>
+                                Skill Gap Recommendations (Rule-Based)
+                            </h5>
+                            <span class="rule-badge-tag">Curated Advice</span>
+                        </div>
+                        <div id="standalone-rule-recs-container">
+                            <div class="rule-rec-empty-success">
+                                <i data-lucide="check-circle-2" style="width: 18px; height: 18px; flex-shrink: 0;"></i>
+                                <span>Run evaluation above to view targeted skill learning guidelines.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Overlapping Keywords Subcard -->
+                    <div class="ai-subcard">
+                        <div class="ai-subcard-header">
+                            <h5>
+                                <i data-lucide="hash" style="color: var(--primary); width: 16px; height: 16px;"></i>
+                                Overlapping Keywords (TF-IDF)
+                            </h5>
+                        </div>
+                        <div class="skills-badge-list" id="standalone-keywords-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Extracted Text Code Inspector Card -->
+    {% if resume and resume.filename %}
+    <div class="saas-card">
+        <div class="saas-card-header">
+            <h3>Extracted Resume Text (PyPDF2)</h3>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="copyResumeText(this)">
+                <i data-lucide="copy"></i>
+                <span>Copy Text</span>
+            </button>
+        </div>
+        <div class="code-preview-box">
+            <pre class="code-preview-text" id="raw-resume-text">{{ resume.text }}</pre>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Setup Dropzone Drag & Drop
+    const dropzone = document.getElementById('saas-dropzone');
+    const fileInput = document.getElementById('resume-file-input');
+    const filePill = document.getElementById('selected-file-pill');
+    const fileNameText = document.getElementById('selected-file-name-text');
+
+    if (dropzone && fileInput) {
+        dropzone.addEventListener('click', (e) => {
+            if (e.target !== fileInput) fileInput.click();
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                fileNameText.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                filePill.style.display = 'inline-flex';
+            } else {
+                filePill.style.display = 'none';
+            }
+        });
+
+        ['dragenter', 'dragover'].forEach(name => {
+            dropzone.addEventListener(name, (e) => {
+                e.preventDefault();
+                dropzone.classList.add('drag-active');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(name => {
+            dropzone.addEventListener(name, (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('drag-active');
+            });
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                const ev = new Event('change');
+                fileInput.dispatchEvent(ev);
+            }
+        });
+    }
+
+    function copyResumeText(btn) {
+        const pre = document.getElementById('raw-resume-text');
+        if (!pre) return;
+        navigator.clipboard.writeText(pre.textContent).then(() => {
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<span>Copied!</span>';
+            setTimeout(() => { btn.innerHTML = orig; }, 2000);
+        });
+    }
+
+    function loadJobIntoTextarea(appId) {
+        const select = document.getElementById('standalone-job-select');
+        const textarea = document.getElementById('standalone-job-desc');
+        if (!select || !textarea || !appId) return;
+        const opt = select.options[select.selectedIndex];
+        const desc = opt.getAttribute('data-description');
+        if (desc) textarea.value = desc;
+    }
+
+    async function handleStandaloneJobMatch(e) {
+        e.preventDefault();
+        const btn = document.getElementById('standalone-match-btn');
+        const desc = document.getElementById('standalone-job-desc').value.trim();
+        const customResume = document.getElementById('standalone-custom-resume').value.trim();
+
+        if (!desc) {
+            alert('Please enter a job description.');
+            return;
+        }
+
+        const origHtml = btn.innerHTML;
+        btn.innerHTML = '<span>⏳ Evaluating...</span>';
+        btn.disabled = true;
+
+        try {
+            const payload = { job_description: desc };
+            if (customResume) payload.resume_text = customResume;
+
+            const res = await fetch('/analyze-job', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Evaluation failed');
+
+            displayStandaloneResults(data);
+        } catch (err) {
+            alert('Evaluation notice: ' + err.message);
+        } finally {
+            btn.innerHTML = origHtml;
+            btn.disabled = false;
+        }
+    }
+
+    function displayStandaloneResults(data) {
+        const container = document.getElementById('standalone-result-container');
+        const pctEl = document.getElementById('standalone-match-pct');
+        const circle = document.getElementById('standalone-gauge-circle');
+        const badge = document.getElementById('standalone-strength-badge');
+        const simEl = document.getElementById('standalone-sim-score');
+        const srcEl = document.getElementById('standalone-source-val');
+        
+        const matchedList = document.getElementById('standalone-matched-list');
+        const matchedCount = document.getElementById('standalone-matched-count');
+        const missingList = document.getElementById('standalone-missing-list');
+        const missingCount = document.getElementById('standalone-missing-count');
+        const keywordsList = document.getElementById('standalone-keywords-list');
+
+        const pct = data.match_percentage || 0;
+        pctEl.textContent = `${pct}%`;
+        
+        // Circumference is 2 * PI * 70 = ~440
+        const circumference = 440;
+        const offset = circumference - (pct / 100) * circumference;
+        if (circle) {
+            circle.style.strokeDashoffset = offset;
+            if (pct >= 70) circle.style.stroke = 'var(--success)';
+            else if (pct >= 40) circle.style.stroke = 'var(--warning)';
+            else circle.style.stroke = 'var(--danger)';
+        }
+
+        if (badge) {
+            badge.className = 'strength-badge';
+            if (pct >= 70) { badge.textContent = 'Strong Match'; badge.classList.add('strength-strong'); }
+            else if (pct >= 40) { badge.textContent = 'Moderate'; badge.classList.add('strength-moderate'); }
+            else { badge.textContent = 'Low Fit'; badge.classList.add('strength-low'); }
+        }
+
+        if (simEl) simEl.textContent = data.similarity_score !== undefined ? data.similarity_score.toFixed(4) : '0.0000';
+        if (srcEl) srcEl.textContent = data.resume_source === 'temporary_store' ? 'In-Memory PDF' : 'Custom Input';
+
+        // Skill Gap Analysis (Required Skills, Your Skills, Missing Skills)
+        const requiredSkills = data.required_skills || data.job_skills || [];
+        const yourSkills = data.your_skills || data.resume_skills || [];
+        const missingSkills = data.missing_skills || [];
+        const skillCoverage = data.skill_coverage !== undefined ? data.skill_coverage : (data.skill_match_percentage !== undefined ? data.skill_match_percentage : 0);
+
+        const coverageBadge = document.getElementById('standalone-skill-coverage-pct');
+        const reqCount = document.getElementById('standalone-req-count');
+        const reqList = document.getElementById('standalone-required-skills');
+        const yourCount = document.getElementById('standalone-your-count');
+        const yourList = document.getElementById('standalone-your-skills');
+        const missCount = document.getElementById('standalone-miss-count');
+        const missList = document.getElementById('standalone-missing-skills');
+
+        if (coverageBadge) coverageBadge.textContent = `${skillCoverage}%`;
+
+        // Required Skills
+        if (reqCount) reqCount.textContent = requiredSkills.length;
+        if (reqList) {
+            if (requiredSkills.length > 0) {
+                reqList.innerHTML = requiredSkills.map(s => 
+                    `<span class="skill-pill skill-pill-required">✓ ${escapeHtml(s)}</span>`
+                ).join('');
+            } else {
+                reqList.innerHTML = '<span class="no-skills-note">No technical skills detected in job.</span>';
+            }
+        }
+
+        // Your Skills (Found in Resume)
+        if (yourCount) yourCount.textContent = yourSkills.length;
+        if (yourList) {
+            if (yourSkills.length > 0) {
+                yourList.innerHTML = yourSkills.map(s => 
+                    `<span class="skill-pill skill-pill-your">✓ ${escapeHtml(s)}</span>`
+                ).join('');
+            } else {
+                yourList.innerHTML = '<span class="no-skills-note">No skills detected in resume.</span>';
+            }
+        }
+
+        // Missing Skills
+        if (missCount) missCount.textContent = missingSkills.length;
+        if (missList) {
+            if (missingSkills.length > 0) {
+                missList.innerHTML = missingSkills.map(s => 
+                    `<span class="skill-pill skill-pill-missing">✗ ${escapeHtml(s)}</span>`
+                ).join('');
+            } else if (requiredSkills.length > 0) {
+                missList.innerHTML = '<span class="no-skills-note" style="color: var(--success); font-weight: 600;">✓ None — All required skills matched!</span>';
+            } else {
+                missList.innerHTML = '<span class="no-skills-note">None</span>';
+            }
+        }
+
+        // Rule-Based Recommendations
+        const recsContainer = document.getElementById('standalone-rule-recs-container');
+        const gapRecs = data.skill_gap_recommendations || [];
+
+        if (recsContainer) {
+            if (gapRecs.length > 0) {
+                recsContainer.innerHTML = `
+                    <div class="rule-rec-list">
+                        ${gapRecs.map(r => `
+                            <div class="rule-rec-item">
+                                <div class="rule-rec-item-top">
+                                    <span class="rule-rec-skill-badge">✗ ${escapeHtml(r.skill)}</span>
+                                    <span style="font-size: 11px; color: var(--text-muted);">Skill Gap Advisory</span>
+                                </div>
+                                <div class="rule-rec-guideline">${escapeHtml(r.recommendation)}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else if (requiredSkills.length > 0 && missingSkills.length === 0) {
+                recsContainer.innerHTML = `
+                    <div class="rule-rec-empty-success">
+                        <i data-lucide="check-circle-2" style="width: 20px; height: 20px; flex-shrink: 0; color: var(--success);"></i>
+                        <div>
+                            <strong>Perfect Technical Alignment!</strong>
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">Your resume covers all ${requiredSkills.length} required skills identified for this position.</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                recsContainer.innerHTML = `
+                    <div class="rule-rec-empty-success" style="background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.25); color: #A5B4FC;">
+                        <i data-lucide="info" style="width: 20px; height: 20px; flex-shrink: 0; color: var(--primary);"></i>
+                        <div>
+                            <strong>No Skill Gaps Detected</strong>
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">No specific technical requirements were detected in the job description to generate gap recommendations.</div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        const kws = data.matching_keywords || [];
+        if (keywordsList) {
+            keywordsList.innerHTML = kws.length ? kws.map(k => `<span class="btn-table-action" style="font-size: 11px;">${escapeHtml(k)}</span>`).join('') : '<span class="no-skills-note">None</span>';
+        }
+
+        // Populate Weighted Score Breakdown
+        const skillScore = data.skill_match_score !== undefined ? data.skill_match_score : (data.skill_match_percentage !== undefined ? data.skill_match_percentage : 0);
+        const tfidfScore = data.tfidf_similarity_score !== undefined ? data.tfidf_similarity_score : (data.tfidf_match_percentage !== undefined ? data.tfidf_match_percentage : 0);
+        const finalScore = data.final_match_score !== undefined ? data.final_match_score : pct;
+
+        const skillValEl = document.getElementById('standalone-skill-score-val');
+        const skillBarEl = document.getElementById('standalone-skill-progress-bar');
+        const tfidfValEl = document.getElementById('standalone-tfidf-score-val');
+        const tfidfBarEl = document.getElementById('standalone-tfidf-progress-bar');
+        const formulaEl = document.getElementById('standalone-weighted-formula');
+
+        if (skillValEl) skillValEl.textContent = `${skillScore}%`;
+        if (skillBarEl) skillBarEl.style.width = `${Math.min(100, Math.max(0, skillScore))}%`;
+        if (tfidfValEl) tfidfValEl.textContent = `${tfidfScore}%`;
+        if (tfidfBarEl) tfidfBarEl.style.width = `${Math.min(100, Math.max(0, tfidfScore))}%`;
+        if (formulaEl) {
+            formulaEl.innerHTML = `(${skillScore}% × 0.60) + (${tfidfScore}% × 0.40) = <strong>${finalScore}% Final Match</strong>`;
+        }
+
+        container.style.display = 'block';
+        container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+</script>
+{% endblock %}

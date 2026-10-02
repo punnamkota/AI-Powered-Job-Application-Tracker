@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Applications — CareerTrack AI{% endblock %}
+{% block page_title %}Job Applications{% endblock %}
+{% block page_subtitle %}Manage, filter, and track all your target companies and roles.{% endblock %}
+
+{% block content %}
+<div class="applications-page">
+    
+    <!-- Top Summary Pills & Filter Controls -->
+    <div class="table-card" style="margin-bottom: 24px; padding: 18px 24px;">
+        <div class="table-toolbar" style="margin-bottom: 0;">
+            <!-- Status Filter Pills -->
+            <div class="status-filter-pills">
+                <button type="button" class="filter-pill-btn active" onclick="filterJobsByStatus('all', this)">
+                    All (<span id="total-count">{{ jobs|length }}</span>)
+                </button>
+                <button type="button" class="filter-pill-btn" onclick="filterJobsByStatus('Applied', this)">
+                    Applied ({{ jobs|selectattr('status', 'equalto', 'Applied')|list|length }})
+                </button>
+                <button type="button" class="filter-pill-btn" onclick="filterJobsByStatus('Interview', this)">
+                    Interview ({{ jobs|selectattr('status', 'equalto', 'Interview')|list|length }})
+                </button>
+                <button type="button" class="filter-pill-btn" onclick="filterJobsByStatus('Offer', this)">
+                    Offer ({{ jobs|selectattr('status', 'equalto', 'Offer')|list|length }})
+                </button>
+                <button type="button" class="filter-pill-btn" onclick="filterJobsByStatus('Pending', this)">
+                    Pending ({{ jobs|selectattr('status', 'equalto', 'Pending')|list|length }})
+                </button>
+                <button type="button" class="filter-pill-btn" onclick="filterJobsByStatus('Rejected', this)">
+                    Rejected ({{ jobs|selectattr('status', 'equalto', 'Rejected')|list|length }})
+                </button>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="header-action-group">
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-sm">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Dashboard View</span>
+                </a>
+                <button type="button" class="btn btn-primary btn-sm" onclick="openAddJobModal()">
+                    <i data-lucide="plus"></i>
+                    <span>Add Application</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Applications Grid -->
+    <div class="apps-grid-view" id="jobs-grid">
+        {% if jobs %}
+            {% for job in jobs %}
+            <div class="app-saas-card" data-status="{{ job.status }}" data-search="{{ job.company|lower }} {{ job.job_role|lower }} {{ job.status|lower }}">
+                <div class="app-card-header">
+                    <div>
+                        <h3 class="app-card-company">{{ job.company }}</h3>
+                        <p class="app-card-role">{{ job.job_role }}</p>
+                    </div>
+                    <span class="status-badge-saas status-{{ job.status|lower }}">
+                        <span class="status-dot"></span>
+                        {{ job.status }}
+                    </span>
+                </div>
+
+                <div class="app-card-body">
+                    <div class="app-detail-row">
+                        <i data-lucide="calendar"></i>
+                        <span>Applied: <strong>{{ job.date_applied }}</strong></span>
+                    </div>
+
+                    {% if job.job_link %}
+                    <div class="app-detail-row">
+                        <i data-lucide="external-link"></i>
+                        <a href="{{ job.job_link }}" target="_blank" rel="noopener noreferrer">View Job Posting</a>
+                    </div>
+                    {% endif %}
+
+                    {% if job.job_description %}
+                    <div class="app-detail-row" style="align-items: flex-start;">
+                        <i data-lucide="file-text" style="margin-top: 2px;"></i>
+                        <span style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; color: var(--text-secondary);">
+                            {{ job.job_description }}
+                        </span>
+                    </div>
+                    {% endif %}
+
+                    {% if job.notes %}
+                    <div class="app-detail-row" style="align-items: flex-start;">
+                        <i data-lucide="sticky-note" style="margin-top: 2px;"></i>
+                        <span style="font-size: 12px; color: var(--text-muted); font-style: italic;">
+                            {{ job.notes }}
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="app-card-footer">
+                    <a href="{{ url_for('dashboard') }}#ai-analysis-section" class="btn-table-action btn-table-analyze" onclick="sessionStorage.setItem('evalJobId', '{{ job.id }}')">
+                        <i data-lucide="sparkles"></i>
+                        <span>AI Match</span>
+                    </a>
+
+                    <div class="app-card-actions">
+                        <a href="{{ url_for('edit_job', id=job.id) }}" class="btn-table-action" title="Edit Application">
+                            <i data-lucide="edit-3"></i>
+                            <span>Edit</span>
+                        </a>
+                        <form action="{{ url_for('delete_job', id=job.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete {{ job.company }} ({{ job.job_role }})?')">
+                            <button type="submit" class="btn-table-action btn-table-delete" title="Delete Application">
+                                <i data-lucide="trash-2"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="ai-empty-prompt" style="grid-column: 1 / -1; padding: 60px 20px;">
+                <div class="ai-empty-icon-circle">
+                    <i data-lucide="briefcase"></i>
+                </div>
+                <h4>No Applications Tracked Yet</h4>
+                <p style="margin-bottom: 20px;">Start tracking positions to unlock AI skill matching, interview metrics, and status workflows.</p>
+                <button type="button" class="btn btn-primary" onclick="openAddJobModal()">
+                    <i data-lucide="plus"></i>
+                    <span>Add Your First Application</span>
+                </button>
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function filterJobsByStatus(status, btnElement) {
+        // Update active tab button
+        document.querySelectorAll('.status-filter-pills .filter-pill-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        if (btnElement) btnElement.classList.add('active');
+
+        const cards = document.querySelectorAll('.app-saas-card');
+        cards.forEach(card => {
+            const cardStatus = card.getAttribute('data-status');
+            if (status === 'all' || cardStatus === status) {
+                card.style.display = 'flex';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+</script>
+{% endblock %}

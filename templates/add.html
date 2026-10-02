@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Add Job Application — CareerTrack AI{% endblock %}
+{% block page_title %}New Job Application{% endblock %}
+{% block page_subtitle %}Log a new target position to track progress and evaluate resume compatibility.{% endblock %}
+
+{% block content %}
+<div class="saas-card" style="max-width: 680px; margin: 0 auto;">
+    <div class="saas-card-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="modal-icon-badge">
+                <i data-lucide="plus-circle"></i>
+            </div>
+            <div>
+                <h3>Add Position Details</h3>
+                <p class="modal-subtitle">Fill in role specifics and technical description for AI matching.</p>
+            </div>
+        </div>
+    </div>
+
+    <form action="{{ url_for('add_job') }}" method="POST" class="modal-form" style="padding: 10px 0 0;">
+        <div class="form-row">
+            <div class="form-group flex-1">
+                <label for="company">Company Name <span class="required-star">*</span></label>
+                <input type="text" id="company" name="company" placeholder="e.g. Stripe, Linear, Google" required>
+            </div>
+            <div class="form-group flex-1">
+                <label for="job_role">Job Role / Position <span class="required-star">*</span></label>
+                <input type="text" id="job_role" name="job_role" placeholder="e.g. Senior Backend Engineer" required>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group flex-1">
+                <label for="status">Application Status <span class="required-star">*</span></label>
+                <select id="status" name="status" required>
+                    <option value="Pending">Pending</option>
+                    <option value="Applied" selected>Applied</option>
+                    <option value="Interview">Interview</option>
+                    <option value="Offer">Offer</option>
+                    <option value="Rejected">Rejected</option>
+                </select>
+            </div>
+            <div class="form-group flex-1">
+                <label for="date_applied">Date Applied <span class="required-star">*</span></label>
+                <input type="date" id="date_applied" name="date_applied" required>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="job_link">Job Posting Link (Optional)</label>
+            <input type="url" id="job_link" name="job_link" placeholder="https://careers.company.com/job/12345">
+        </div>
+
+        <div class="form-group">
+            <label for="job_description">Job Description & Requirements (Optional)</label>
+            <textarea id="job_description" name="job_description" rows="5" placeholder="Paste key responsibilities, qualifications, and required tech stack..."></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="notes">Private Notes (Optional)</label>
+            <textarea id="notes" name="notes" rows="3" placeholder="Recruiter contacts, salary expectation, referral notes..."></textarea>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 10px;">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                <i data-lucide="check"></i>
+                <span>Save Application</span>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

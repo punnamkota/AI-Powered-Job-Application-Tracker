@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CareerTrack AI — Intelligent Job Tracker{% endblock %}</title>
+    
+    <!-- Google Fonts: Plus Jakarta Sans & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Design System CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="saas-app">
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="app-sidebar" id="app-sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-logo-icon">
+                    <i data-lucide="sparkles"></i>
+                </div>
+                <div class="brand-text-wrap">
+                    <span class="brand-name">CareerTrack <span class="brand-accent">AI</span></span>
+                    <span class="brand-tag">Intelligent SaaS</span>
+                </div>
+                <button type="button" class="sidebar-close-btn" id="sidebar-close-btn" aria-label="Close Sidebar">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section-label">MAIN NAVIGATION</div>
+                
+                <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.path == url_for('dashboard') %}active{% endif %}">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Dashboard</span>
+                </a>
+                
+                <a href="{{ url_for('index') }}" class="nav-item {% if request.path == url_for('index') %}active{% endif %}">
+                    <i data-lucide="briefcase"></i>
+                    <span>Applications</span>
+                </a>
+                
+                <a href="{{ url_for('resume_page') }}" class="nav-item {% if request.path == url_for('resume_page') %}active{% endif %}">
+                    <i data-lucide="file-text"></i>
+                    <span>Resume & AI Matcher</span>
+                </a>
+
+                <div class="nav-section-label">WORKSPACES</div>
+                
+                <a href="{{ url_for('dashboard') }}#ai-analysis-section" class="nav-item">
+                    <i data-lucide="cpu"></i>
+                    <span>AI Job Analysis</span>
+                    <span class="nav-pill-badge">NLP</span>
+                </a>
+
+                <a href="{{ url_for('dashboard') }}#analytics-section" class="nav-item">
+                    <i data-lucide="bar-chart-3"></i>
+                    <span>Analytics</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-quick-action">
+                <button type="button" class="btn btn-primary btn-block btn-sidebar-add" onclick="openAddJobModal()">
+                    <i data-lucide="plus-circle"></i>
+                    <span>New Application</span>
+                </button>
+            </div>
+
+            <!-- Sidebar User Profile Footer -->
+            <div class="sidebar-profile">
+                <div class="profile-avatar">
+                    <span>AM</span>
+                    <span class="online-indicator"></span>
+                </div>
+                <div class="profile-info">
+                    <span class="profile-name">Alex Morgan</span>
+                    <span class="profile-role">Senior Candidate</span>
+                </div>
+                <div class="profile-action">
+                    <i data-lucide="settings" class="profile-settings-icon"></i>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="app-main-wrapper">
+            <!-- Top Header Bar -->
+            <header class="app-header">
+                <div class="header-left">
+                    <button type="button" class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle Menu">
+                        <i data-lucide="menu"></i>
+                    </button>
+                    <div class="header-title-wrap">
+                        <h1 class="page-title">{% block page_title %}Job Application Tracker{% endblock %}</h1>
+                        <p class="page-subtitle">{% block page_subtitle %}AI-powered pipeline management and skill fit analytics.{% endblock %}</p>
+                    </div>
+                </div>
+
+                <div class="header-right">
+                    <!-- Global Search Bar -->
+                    <div class="header-search-wrap">
+                        <i data-lucide="search" class="search-icon"></i>
+                        <input type="text" id="global-search-input" placeholder="Search company, role, or skill..." autocomplete="off">
+                        <span class="search-shortcut">⌘K</span>
+                    </div>
+
+                    <!-- Quick Add Trigger -->
+                    <button type="button" class="btn btn-primary btn-header-add" onclick="openAddJobModal()">
+                        <i data-lucide="plus"></i>
+                        <span>Add Job</span>
+                    </button>
+
+                    <!-- Notifications Button -->
+                    <button type="button" class="header-icon-btn" title="Notifications" id="notifications-btn">
+                        <i data-lucide="bell"></i>
+                        <span class="notification-dot"></span>
+                    </button>
+
+                    <!-- Header Avatar -->
+                    <div class="header-avatar" title="Alex Morgan">
+                        <span>AM</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Page Content Container -->
+            <main class="app-content-container">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- Floating SaaS Toast Notification Container -->
+    <div id="toast-container" class="toast-container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="toast-item toast-{{ category }}">
+                        <div class="toast-icon">
+                            {% if category == 'success' %}
+                                <i data-lucide="check-circle-2"></i>
+                            {% elif category == 'error' %}
+                                <i data-lucide="alert-circle"></i>
+                            {% elif category == 'warning' %}
+                                <i data-lucide="alert-triangle"></i>
+                            {% else %}
+                                <i data-lucide="info"></i>
+                            {% endif %}
+                        </div>
+                        <div class="toast-content">{{ message }}</div>
+                        <button type="button" class="toast-close" onclick="this.parentElement.remove()">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Modern SaaS Modal: Add Job Application -->
+    <div class="modal-backdrop" id="add-job-modal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div class="modal-title-wrap">
+                    <div class="modal-icon-badge">
+                        <i data-lucide="briefcase"></i>
+                    </div>
+                    <div>
+                        <h3>Add New Job Application</h3>
+                        <p class="modal-subtitle">Track a new position to analyze resume compatibility and manage status.</p>
+                    </div>
+                </div>
+                <button type="button" class="modal-close-btn" onclick="closeAddJobModal()">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+
+            <form action="{{ url_for('add_job') }}" method="POST" class="modal-form" id="modal-add-form">
+                <div class="form-row">
+                    <div class="form-group flex-1">
+                        <label for="modal-company">Company Name <span class="required-star">*</span></label>
+                        <input type="text" id="modal-company" name="company" placeholder="e.g. Stripe, Linear, Google" required>
+                    </div>
+                    <div class="form-group flex-1">
+                        <label for="modal-job-role">Job Role / Position <span class="required-star">*</span></label>
+                        <input type="text" id="modal-job-role" name="job_role" placeholder="e.g. Senior Backend Engineer" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group flex-1">
+                        <label for="modal-status">Application Status <span class="required-star">*</span></label>
+                        <select id="modal-status" name="status" required>
+                            <option value="Pending">Pending</option>
+                            <option value="Applied" selected>Applied</option>
+                            <option value="Interview">Interview</option>
+                            <option value="Offer">Offer</option>
+                            <option value="Rejected">Rejected</option>
+                        </select>
+                    </div>
+                    <div class="form-group flex-1">
+                        <label for="modal-date-applied">Date Applied <span class="required-star">*</span></label>
+                        <input type="date" id="modal-date-applied" name="date_applied" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="modal-job-link">Job Posting Link (Optional)</label>
+                    <input type="url" id="modal-job-link" name="job_link" placeholder="https://careers.company.com/job/12345">
+                </div>
+
+                <div class="form-group">
+                    <label for="modal-job-description">Job Description & Requirements (Optional)</label>
+                    <textarea id="modal-job-description" name="job_description" rows="4" placeholder="Paste requirements, responsibilities, and technical skills for instant AI matching..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="modal-notes">Private Notes (Optional)</label>
+                    <textarea id="modal-notes" name="notes" rows="2" placeholder="Referrals, recruiter contact details, salary range..."></textarea>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddJobModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i data-lucide="check"></i>
+                        <span>Save Application</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Core App Scripts -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        // Initialize Lucide icons on load
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ job.company }} — CareerTrack AI{% endblock %}
+{% block page_title %}Edit Job Application{% endblock %}
+{% block page_subtitle %}Update position details, application stage, and requirements.{% endblock %}
+
+{% block content %}
+<div class="saas-card" style="max-width: 680px; margin: 0 auto;">
+    <div class="saas-card-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="modal-icon-badge">
+                <i data-lucide="edit-3"></i>
+            </div>
+            <div>
+                <h3>Edit Application: {{ job.company }}</h3>
+                <p class="modal-subtitle">Modify role details, update stage, or refine job description for AI matching.</p>
+            </div>
+        </div>
+    </div>
+
+    <form action="{{ url_for('edit_job', id=job.id) }}" method="POST" class="modal-form" style="padding: 10px 0 0;">
+        <div class="form-row">
+            <div class="form-group flex-1">
+                <label for="company">Company Name <span class="required-star">*</span></label>
+                <input type="text" id="company" name="company" value="{{ job.company }}" required>
+            </div>
+            <div class="form-group flex-1">
+                <label for="job_role">Job Role / Position <span class="required-star">*</span></label>
+                <input type="text" id="job_role" name="job_role" value="{{ job.job_role }}" required>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group flex-1">
+                <label for="status">Application Status <span class="required-star">*</span></label>
+                <select id="status" name="status" required>
+                    <option value="Pending" {% if job.status == 'Pending' %}selected{% endif %}>Pending</option>
+                    <option value="Applied" {% if job.status == 'Applied' %}selected{% endif %}>Applied</option>
+                    <option value="Interview" {% if job.status == 'Interview' %}selected{% endif %}>Interview</option>
+                    <option value="Offer" {% if job.status == 'Offer' %}selected{% endif %}>Offer</option>
+                    <option value="Rejected" {% if job.status == 'Rejected' %}selected{% endif %}>Rejected</option>
+                </select>
+            </div>
+            <div class="form-group flex-1">
+                <label for="date_applied">Date Applied <span class="required-star">*</span></label>
+                <input type="date" id="date_applied" name="date_applied" value="{{ job.date_applied }}" required>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="job_link">Job Posting Link (Optional)</label>
+            <input type="url" id="job_link" name="job_link" value="{{ job.job_link or '' }}" placeholder="https://example.com/job-posting">
+        </div>
+
+        <div class="form-group">
+            <label for="job_description">Job Description & Requirements (Optional)</label>
+            <textarea id="job_description" name="job_description" rows="5" placeholder="Paste key details from the job post...">{{ job.job_description or '' }}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="notes">Private Notes (Optional)</label>
+            <textarea id="notes" name="notes" rows="3" placeholder="Recruiter contacts, interview notes, feedback...">{{ job.notes or '' }}</textarea>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 10px;">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                <i data-lucide="check"></i>
+                <span>Update Application</span>
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Interview Timeline Section -->
+<div class="saas-card" style="max-width: 680px; margin: 24px auto 0;">
+    <div class="saas-card-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="modal-icon-badge" style="background: rgba(99, 102, 241, 0.15); color: var(--primary);">
+                <i data-lucide="calendar"></i>
+            </div>
+            <div>
+                <h3>Interview Timeline</h3>
+                <p class="modal-subtitle">Track interview rounds, dates, types, and progress notes for {{ job.company }}.</p>
+            </div>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" onclick="openInterviewModal({{ job.id }}, '{{ job.company|escape }}', '{{ job.job_role|escape }}')">
+            <i data-lucide="plus"></i>
+            <span>Schedule Interview</span>
+        </button>
+    </div>
+
+    {% if interviews %}
+    <div class="interview-timeline-wrap">
+        {% for interview in interviews %}
+        <div class="interview-timeline-item">
+            <div class="timeline-node-marker"></div>
+            <div class="timeline-header-row">
+                <div class="timeline-date-display">
+                    <i data-lucide="calendar" style="width: 14px; height: 14px; color: var(--primary);"></i>
+                    <span>{{ interview.interview_date }}</span>
+                </div>
+                <div class="timeline-badge-group">
+                    <span class="timeline-round-pill">{{ interview.interview_round }}</span>
+                    <span class="timeline-type-pill">{{ interview.interview_type }}</span>
+                    <span class="timeline-status-pill status-{{ interview.status|lower }}">{{ interview.status }}</span>
+                </div>
+            </div>
+            {% if interview.notes %}
+            <div class="timeline-notes-box">
+                {{ interview.notes }}
+            </div>
+            {% endif %}
+            <div class="timeline-item-actions">
+                <button type="button" class="btn-table-action" onclick="openEditInterviewModal({{ interview.id }}, {{ job.id }}, '{{ job.company|escape }}', '{{ job.job_role|escape }}')">
+                    <i data-lucide="edit-3" style="width: 12px; height: 12px;"></i>
+                    <span>Edit</span>
+                </button>
+                <button type="button" class="btn-table-action btn-table-delete" onclick="handleDeleteInterviewDirect({{ interview.id }}, {{ job.id }})">
+                    <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="ai-empty-prompt" style="padding: 35px 20px;">
+        <div class="ai-empty-icon-circle" style="width: 44px; height: 44px; margin-bottom: 10px;">
+            <i data-lucide="calendar" style="width: 20px; height: 20px;"></i>
+        </div>
+        <h4>No Interviews Scheduled</h4>
+        <p style="font-size: 13px; margin-bottom: 14px;">Track screening calls, technical coding rounds, managerial chats, and final interviews for this position.</p>
+        <button type="button" class="btn btn-primary btn-sm" onclick="openInterviewModal({{ job.id }}, '{{ job.company|escape }}', '{{ job.job_role|escape }}')">
+            <i data-lucide="plus"></i>
+            <span>Add First Interview</span>
+        </button>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
